@@ -29,26 +29,26 @@ export default function HomePage() {
 
 
   useEffect(() => {
-  let alive = true
+    let alive = true
 
-  async function load() {
-    const [r, w] = await Promise.all([
-      getHomeRoutines(),
-      getRecentWorkouts(3),
-    ])
+    async function load() {
+      const [r, w] = await Promise.all([
+        getHomeRoutines(),
+        getRecentWorkouts(3),
+      ])
 
-    if (!alive) return
+      if (!alive) return
 
-    setRoutines(r)
-    setRecentWorkouts(w)
-  }
+      setRoutines(r)
+      setRecentWorkouts(w)
+    }
 
-  load()
+    load()
 
-  return () => {
-    alive = false
-  }
-}, [])
+    return () => {
+      alive = false
+    }
+  }, [])
 
 
   return (
@@ -56,23 +56,25 @@ export default function HomePage() {
       <div className="min-h-screen bg-background pb-20">
         <div className="px-4 py-6 space-y-6">
           {/* Header */}
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight">Hakuna</h1>
-            <p className="text-muted-foreground">
-              Seu app de treinos personalizado
-            </p>
-          </div>
+          <div className="flex items-start justify-between">
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold tracking-tight">Hakuna</h1>
+              <p className="text-muted-foreground">
+                Seu app de treinos personalizado
+              </p>
+            </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={async () => {
-              await signOut()
-              router.push("/login")
-            }}
-          >
-            Sair
-          </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                await signOut()
+                router.push("/login")
+              }}
+            >
+              Sair
+            </Button>
+          </div>
 
           {/* Quick Actions */}
           <div className="grid grid-cols-2 gap-3">

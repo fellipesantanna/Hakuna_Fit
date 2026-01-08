@@ -11,6 +11,10 @@ import { AuthGuard } from "@/components/auth-guard"
 
 import { supabase } from "@/lib/supabase"
 
+/* ============================================================
+   TYPES
+============================================================ */
+
 type WorkoutDetail = {
   id: string
   routineName: string | null
@@ -20,7 +24,7 @@ type WorkoutDetail = {
 
 type WorkoutEntryWithExercise = {
   id: string
-  category: string
+  category: "strength" | "free_weight" | "cardio" | "duration"
 
   reps: number | null
   weight: number | null
@@ -32,8 +36,14 @@ type WorkoutEntryWithExercise = {
   durationMinutes: number | null
   durationSeconds: number | null
 
-  exercises: { name: string }[] | null
+  exercise: {
+    name: string
+  } | null
 }
+
+/* ============================================================
+   PAGE
+============================================================ */
 
 export default function WorkoutDetailPage() {
   const params = useParams<{ id: string }>()
@@ -43,12 +53,13 @@ export default function WorkoutDetailPage() {
   const [entries, setEntries] = useState<WorkoutEntryWithExercise[]>([])
 
   useEffect(() => {
-    load()
+    loadWorkout()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function load() {
-    // 1) WORKOUT (mapeado)
+  async function loadWorkout() {
+    /* ---------------- WORKOUT ---------------- */
+
     const { data: workoutRow, error: workoutErr } = await supabase
       .from("workouts")
       .select("id, routine_name, start_time, end_time")
@@ -65,11 +76,11 @@ export default function WorkoutDetailPage() {
       endTime: workoutRow.end_time,
     })
 
-    // 2) ENTRIES (com join no nome)
+    /* ---------------- ENTRIES + JOIN ---------------- */
+
     const { data: entriesData, error: entriesErr } = await supabase
       .from("workout_exercises")
-      .select(
-        `
+      .select(`
         id,
         category,
         reps,
@@ -79,9 +90,8 @@ export default function WorkoutDetailPage() {
         distance,
         duration_minutes,
         duration_seconds,
-        exercises ( name )
-      `
-      )
+        exercise:exercises ( name )
+      `)
       .eq("workout_id", workoutId)
       .order("id", { ascending: true })
 
@@ -102,16 +112,14 @@ export default function WorkoutDetailPage() {
         durationMinutes: e.duration_minutes,
         durationSeconds: e.duration_seconds,
 
-        exercises: e.exercises,
+        exercise: e.exercise,
       }))
     )
   }
 
-  const strength = entries.filter((e) => e.category === "strength")
-  const cardio = entries.filter((e) => e.category === "cardio")
-  const duration = entries.filter((e) => e.category === "duration")
-  const freeWeight = entries.filter((e) => e.category === "free_weight")
-
+  /* ============================================================
+     HELPERS
+  ============================================================ */
 
   if (!workout) {
     return (
@@ -134,14 +142,20 @@ export default function WorkoutDetailPage() {
     return `${minutes} min`
   }
 
-  const getTotalVolume = () => {
-    return entries.reduce((acc, e) => {
+  const getTotalVolume = () =>
+    entries.reduce((acc, e) => {
       if (e.reps != null && e.weight != null) {
         return acc + e.reps * e.weight
       }
       return acc
     }, 0)
-  }
+
+  const byCategory = (category: WorkoutEntryWithExercise["category"]) =>
+    entries.filter((e) => e.category === category)
+
+  /* ============================================================
+     RENDER
+  ============================================================ */
 
   return (
     <AuthGuard>
@@ -176,7 +190,9 @@ export default function WorkoutDetailPage() {
               <p className="text-xs text-muted-foreground">Execuções</p>
             </div>
             <div>
-              <p className="text-2xl font-bold">{getTotalVolume().toFixed(0)}</p>
+              <p className="text-2xl font-bold">
+                {getTotalVolume().toFixed(0)}
+              </p>
               <p className="text-xs text-muted-foreground">Volume (kg)</p>
             </div>
           </div>
@@ -186,80 +202,104 @@ export default function WorkoutDetailPage() {
         <div className="space-y-4">
           <h2 className="font-semibold">Exercícios</h2>
 
-          {entries.filter(e => e.category === "strength").length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase">
-                Força
-              </h3>
-              {entries.filter(e => e.category === "strength").map((e) => (
-                <Card key={e.id} className="p-4 space-y-1">
-                  <h3 className="font-semibold">{e.exercises?.[0]?.name ?? "—"}</h3>
+          {/* FORÇA */}
+          {byCategory("strength").length > 0 && (
+            <Section title="Força">
+              {byCategory("strength").map((e) => (
+                <CardItem key={e.id} name={e.exercise?.name}>
                   {e.reps != null && (
                     <p className="text-sm">
                       {e.reps} reps × {e.weight ?? 0} kg
                     </p>
                   )}
-                </Card>
+                </CardItem>
               ))}
-            </div>
+            </Section>
           )}
 
-          {entries.filter(e => e.category === "free_weight").length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase">
-                Peso Livre
-              </h3>
-              {entries.filter(e => e.category === "free_weight").map((e) => (
-                <Card key={e.id} className="p-4 space-y-1">
-                  <h3 className="font-semibold">{e.exercises?.[0]?.name ?? "—"}</h3>
+          {/* PESO LIVRE */}
+          {byCategory("free_weight").length > 0 && (
+            <Section title="Peso Livre">
+              {byCategory("free_weight").map((e) => (
+                <CardItem key={e.id} name={e.exercise?.name}>
                   {e.reps != null && (
                     <p className="text-sm">
                       {e.reps} reps × {e.weight ?? 0} kg
                     </p>
                   )}
-                </Card>
+                </CardItem>
               ))}
-            </div>
+            </Section>
           )}
 
-          {entries.filter(e => e.category === "cardio").length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase">
-                Cardio
-              </h3>
-              {entries.filter(e => e.category === "cardio").map((e) => (
-                <Card key={e.id} className="p-4 space-y-1">
-                  <h3 className="font-semibold">{e.exercises?.[0]?.name ?? "—"}</h3>
+          {/* CARDIO */}
+          {byCategory("cardio").length > 0 && (
+            <Section title="Cardio">
+              {byCategory("cardio").map((e) => (
+                <CardItem key={e.id} name={e.exercise?.name}>
                   {e.timeMinutes != null && (
                     <p className="text-sm">
                       ⏱ {e.timeHours || 0}h {e.timeMinutes}m
                       {e.distance != null ? ` • 📏 ${e.distance} m` : ""}
                     </p>
                   )}
-                </Card>
+                </CardItem>
               ))}
-            </div>
+            </Section>
           )}
 
-          {entries.filter(e => e.category === "duration").length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase">
-                Duração
-              </h3>
-              {entries.filter(e => e.category === "duration").map((e) => (
-                <Card key={e.id} className="p-4 space-y-1">
-                  <h3 className="font-semibold">{e.exercises?.[0]?.name ?? "—"}</h3>
+          {/* DURAÇÃO */}
+          {byCategory("duration").length > 0 && (
+            <Section title="Duração">
+              {byCategory("duration").map((e) => (
+                <CardItem key={e.id} name={e.exercise?.name}>
                   {e.durationMinutes != null && (
                     <p className="text-sm">
                       ⏱ {e.durationMinutes}m {e.durationSeconds || 0}s
                     </p>
                   )}
-                </Card>
+                </CardItem>
               ))}
-            </div>
+            </Section>
           )}
         </div>
       </div>
     </AuthGuard>
+  )
+}
+
+/* ============================================================
+   UI HELPERS
+============================================================ */
+
+function Section({
+  title,
+  children,
+}: {
+  title: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="space-y-2">
+      <h3 className="text-sm font-semibold text-muted-foreground uppercase">
+        {title}
+      </h3>
+      {children}
+    </div>
+  )
+}
+
+function CardItem({
+  name,
+  children,
+}: {
+  name?: string
+  children?: React.ReactNode
+}) {
+  return (
+    <Card className="p-4 space-y-1">
+      <h3 className="font-semibold">{name ?? "—"}</h3>
+      {children}
+    </Card>
   )
 }

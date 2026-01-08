@@ -58,23 +58,21 @@ export function WorkoutContent() {
     try {
       setLoading(true)
 
-      /* 1) Exercícios base (para adicionar novos) */
+      /* 1) Exercícios base */
       const allExercises = await getExercises()
       setExercises(allExercises)
 
-      /* 2) Nome da rotina (se houver) */
-      let routineName: string | undefined = undefined
+      /* 2) Nome da rotina */
+      let routineName: string | undefined
 
       if (routineId) {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from("routines")
           .select("name")
           .eq("id", routineId)
           .single()
 
-        if (!error && data?.name) {
-          routineName = data.name
-        }
+        routineName = data?.name
       }
 
       /* 3) Cria workout */
@@ -83,15 +81,15 @@ export function WorkoutContent() {
         routineName,
       })
 
-      if (!w?.id) {
-        throw new Error("Workout não criado corretamente")
-      }
+      if (!w?.id) throw new Error("Workout não criado")
 
       setWorkout(w)
 
-      /* 4) Se veio de rotina → cria séries iniciais */
+      /* 4) Herdar exercícios da rotina (ORDENADOS) */
       if (routineId) {
-        const routineExercises = await getRoutineExercises(routineId)
+        const routineExercises = (await getRoutineExercises(routineId))
+          .sort((a, b) => a.position - b.position)
+
         const bulk: Parameters<typeof addWorkoutExerciseSetsBulk>[0] = []
 
         for (const re of routineExercises) {
@@ -105,6 +103,7 @@ export function WorkoutContent() {
                 category: re.exerciseCategory,
                 reps: re.targetReps ?? null,
                 weight: re.targetWeight ?? null,
+                position: re.position,
               })
             }
 
@@ -116,6 +115,7 @@ export function WorkoutContent() {
                 timeHours: re.targetHours ?? null,
                 timeMinutes: re.targetMinutes ?? null,
                 distance: re.targetDistance ?? null,
+                position: re.position,
               })
             }
 
@@ -126,6 +126,7 @@ export function WorkoutContent() {
                 category: "duration",
                 durationMinutes: re.targetMinutes ?? null,
                 durationSeconds: re.targetSeconds ?? null,
+                position: re.position,
               })
             }
           }
@@ -136,7 +137,7 @@ export function WorkoutContent() {
         }
       }
 
-      /* 5) Carrega entries reais (com equipment + notes) */
+      /* 5) Carrega workout_exercises ORDENADOS */
       const loaded = await getWorkoutExercises(w.id)
       setEntries(loaded)
     } catch (err) {
@@ -149,30 +150,33 @@ export function WorkoutContent() {
   }
 
   /* =========================
-     Derived
+     Derived (ORDENADO)
   ========================= */
   const grouped = useMemo(() => {
-    const m = new Map<string, WorkoutExerciseWithName[]>()
+    const map = new Map<string, WorkoutExerciseWithName[]>()
 
     for (const e of entries) {
       const key = e.exerciseId
-      const list = m.get(key) ?? []
+      const list = map.get(key) ?? []
       list.push(e)
-      m.set(key, list)
+      map.set(key, list)
     }
 
-    return Array.from(m.entries()).map(([exerciseId, sets]) => {
-      const first = sets[0]
+    return Array.from(map.entries())
+      .map(([exerciseId, sets]) => {
+        const first = sets[0]
 
-      return {
-        exerciseId,
-        sets,
-        name: first?.exerciseName ?? "",
-        category: first?.category as ExerciseCategory,
-        equipment: first?.exerciseEquipment ?? null,
-        notes: first?.exerciseNotes ?? null,
-      }
-    })
+        return {
+          exerciseId,
+          position: first.position ?? 0,
+          sets,
+          name: first.exerciseName ?? "",
+          category: first.category as ExerciseCategory,
+          equipment: first.exerciseEquipment ?? null,
+          notes: first.exerciseNotes ?? null,
+        }
+      })
+      .sort((a, b) => a.position - b.position)
   }, [entries])
 
   /* =========================
@@ -191,6 +195,7 @@ export function WorkoutContent() {
       workoutId: workout.id,
       exerciseId: ex.id,
       category: ex.category,
+      position: grouped.length,
     })
 
     await refresh()
@@ -199,10 +204,13 @@ export function WorkoutContent() {
   async function handleAddSet(exerciseId: string, category: ExerciseCategory) {
     if (!workout) return
 
+    const group = grouped.find((g) => g.exerciseId === exerciseId)
+
     await addWorkoutExerciseSet({
       workoutId: workout.id,
       exerciseId,
       category,
+      position: group?.position ?? 0,
     })
 
     await refresh()
@@ -228,7 +236,7 @@ export function WorkoutContent() {
 
   async function handleCancel() {
     if (!workout) return
-    const confirmed = confirm("Cancelar treino? Os dados serão perdidos.")
+    const confirmed = confirm("Cancelar treino?")
     if (!confirmed) return
 
     await cancelWorkout(workout.id)
@@ -239,19 +247,8 @@ export function WorkoutContent() {
     if (!workout) return
 
     await finishWorkout(workout.id)
-
-    setWorkout((prev) =>
-      prev
-        ? {
-          ...prev,
-          endTime: new Date().toISOString(),
-        }
-        : prev
-    )
-
     router.push("/history")
   }
-
 
   /* =========================
      Render
@@ -270,100 +267,72 @@ export function WorkoutContent() {
         {workout.routineName ?? "Treino Livre"}
       </h1>
 
-      {/* LISTA DE EXERCÍCIOS */}
-      {grouped.length === 0 ? (
-        <Card className="p-6 text-center">
-          <p className="text-muted-foreground">
-            Nenhum exercício neste treino
-          </p>
-        </Card>
-      ) : (
-        grouped.map((g) => (
-          <Card key={g.exerciseId} className="p-4 space-y-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1">
-                <h3 className="font-semibold">{g.name || "Exercício"}</h3>
-
-                <p className="text-xs text-muted-foreground">
-                  {labelCategory(g.category)} • {g.sets.length} série(s)
-                </p>
-
-                {g.equipment && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Equipamento: {g.equipment}
-                  </p>
-                )}
-
-                {g.notes && (
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                    {g.notes}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleAddSet(g.exerciseId, g.category)}
-                >
-                  + Série
-                </Button>
-
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleRemoveExercise(g.exerciseId)}
-                >
-                  Remover
-                </Button>
-              </div>
+      {grouped.map((g) => (
+        <Card key={g.exerciseId} className="p-4 space-y-3">
+          <div className="flex justify-between gap-3">
+            <div>
+              <h3 className="font-semibold">{g.name}</h3>
+              <p className="text-xs text-muted-foreground">
+                {labelCategory(g.category)} • {g.sets.length} série(s)
+              </p>
             </div>
 
-            {/* SÉRIES */}
-            <div className="space-y-3">
-              {g.sets.map((setEntry, idx) => (
-                <div key={setEntry.id} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">
-                      Série {idx + 1}
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleRemoveSet(setEntry.id)}
-                    >
-                      Apagar série
-                    </Button>
-                  </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleAddSet(g.exerciseId, g.category)}
+              >
+                + Série
+              </Button>
 
-                  <WorkoutEntry entry={setEntry} />
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleRemoveExercise(g.exerciseId)}
+              >
+                Remover
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {g.sets.map((setEntry, idx) => (
+              <div key={setEntry.id} className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-xs text-muted-foreground">
+                    Série {idx + 1}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleRemoveSet(setEntry.id)}
+                  >
+                    Apagar série
+                  </Button>
                 </div>
-              ))}
-            </div>
-          </Card>
-        ))
-      )}
 
-      {/* ADICIONAR EXERCÍCIO */}
+                <WorkoutEntry entry={setEntry} />
+              </div>
+            ))}
+          </div>
+        </Card>
+      ))}
+
       <Card className="p-4 space-y-2">
         <h2 className="font-semibold">Adicionar exercício</h2>
-
-        <div className="space-y-2">
-          {exercises.map((ex) => (
-            <Button
-              key={ex.id}
-              variant="outline"
-              className="w-full justify-start"
-              onClick={() => handleAddExercise(ex)}
-            >
-              {ex.name}
-            </Button>
-          ))}
-        </div>
+        {exercises.map((ex) => (
+          <Button
+            key={ex.id}
+            variant="outline"
+            className="w-full justify-start"
+            onClick={() => handleAddExercise(ex)}
+          >
+            {ex.name}
+          </Button>
+        ))}
       </Card>
 
-      {/* ACTIONS */}
       <div className="flex gap-3 pt-4">
         <Button variant="outline" className="w-1/2" onClick={handleCancel}>
           Cancelar

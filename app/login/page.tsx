@@ -6,6 +6,8 @@ import { signIn, signUp } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
+import { Eye, EyeOff } from "lucide-react"
+
 
 export default function LoginPage() {
   const router = useRouter()
@@ -14,6 +16,8 @@ export default function LoginPage() {
   const [isRegister, setIsRegister] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
+
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -48,13 +52,29 @@ export default function LoginPage() {
             required
           />
 
-          <Input
-            type="password"
-            placeholder="Senha"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+          <div className="relative">
+            <Input
+              type={showPassword ? "text" : "password"}
+              placeholder="Senha"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="pr-10"
+            />
+
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            >
+              {showPassword ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+            </button>
+          </div>
+
 
           {error && (
             <p className="text-sm text-destructive text-center">
@@ -66,8 +86,8 @@ export default function LoginPage() {
             {loading
               ? "Aguarde..."
               : isRegister
-              ? "Criar conta"
-              : "Entrar"}
+                ? "Criar conta"
+                : "Entrar"}
           </Button>
         </form>
 

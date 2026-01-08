@@ -20,21 +20,14 @@ function toNumberOrNull(v: string) {
 const DEFAULT_REST_SECONDS = 60
 
 export function WorkoutEntry({ entry }: Props) {
-  const [completed, setCompleted] = useState<boolean>(false)
   const [restEndAt, setRestEndAt] = useState<number | null>(null)
-  const [restRemaining, setRestRemaining] = useState<number>(0)
-
-  // 🔑 estado local começa sempre falso
-  useEffect(() => {
-    setCompleted(false)
-  }, [entry.id])
+  const [restRemaining, setRestRemaining] = useState(0)
 
   async function save(payload: Partial<WorkoutExercise>) {
     await updateWorkoutExercise(entry.id, payload)
   }
 
   async function finishSet() {
-    setCompleted(true) // ✅ UI responde na hora
     await save({ completed: true })
     setRestEndAt(Date.now() + DEFAULT_REST_SECONDS * 1000)
   }
@@ -61,19 +54,48 @@ export function WorkoutEntry({ entry }: Props) {
     return () => clearInterval(timer)
   }, [restEndAt])
 
-  const FinishButton = (
-    <Button
-      onClick={finishSet}
-      variant={completed ? "default" : "outline"}
-      className={
-        completed
-          ? "bg-green-600 hover:bg-green-600 text-white"
-          : "text-muted-foreground"
-      }
-    >
-      ✓
-    </Button>
-  )
+  /* =========================
+     INPUT COM SUFIXO
+  ========================= */
+  function InputWithSuffix(props: {
+    placeholder: string
+    defaultValue?: number | string | null
+    suffix: string
+    onBlur: (v: string) => void
+  }) {
+    return (
+      <div className="relative flex-1">
+        <Input
+          placeholder={props.placeholder}
+          defaultValue={props.defaultValue ?? ""}
+          onBlur={(e) => props.onBlur(e.target.value)}
+          className="pr-10"
+        />
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+          {props.suffix}
+        </span>
+      </div>
+    )
+  }
+
+  /* =========================
+     BOTÃO CHECK
+  ========================= */
+  function CheckButton() {
+    return (
+      <Button
+        onClick={finishSet}
+        variant={entry.completed ? "default" : "outline"}
+        className={`h-10 w-10 p-0 ${
+          entry.completed
+            ? "bg-green-600 hover:bg-green-600 text-white"
+            : "text-muted-foreground"
+        }`}
+      >
+        ✓
+      </Button>
+    )
+  }
 
   return (
     <div className="space-y-2">
@@ -81,81 +103,74 @@ export function WorkoutEntry({ entry }: Props) {
       {(entry.category === "strength" ||
         entry.category === "free_weight") && (
         <div className="flex gap-2 items-center">
-          <Input
-            type="number"
+          <InputWithSuffix
             placeholder="Reps"
-            defaultValue={entry.reps ?? ""}
-            onBlur={(e) =>
-              save({ reps: toNumberOrNull(e.target.value) })
-            }
+            suffix="reps"
+            defaultValue={entry.reps}
+            onBlur={(v) => save({ reps: toNumberOrNull(v) })}
           />
-          <Input
-            type="number"
-            placeholder="Kg"
-            defaultValue={entry.weight ?? ""}
-            onBlur={(e) =>
-              save({ weight: toNumberOrNull(e.target.value) })
-            }
+
+          <InputWithSuffix
+            placeholder="Peso"
+            suffix="kg"
+            defaultValue={entry.weight}
+            onBlur={(v) => save({ weight: toNumberOrNull(v) })}
           />
-          {FinishButton}
+
+          <CheckButton />
         </div>
       )}
 
       {/* CARDIO */}
       {entry.category === "cardio" && (
         <div className="flex gap-2 items-center">
-          <Input
-            type="number"
+          <InputWithSuffix
             placeholder="Horas"
-            defaultValue={entry.timeHours ?? ""}
-            onBlur={(e) =>
-              save({ timeHours: toNumberOrNull(e.target.value) })
-            }
+            suffix="h"
+            defaultValue={entry.timeHours}
+            onBlur={(v) => save({ timeHours: toNumberOrNull(v) })}
           />
-          <Input
-            type="number"
+
+          <InputWithSuffix
             placeholder="Min"
-            defaultValue={entry.timeMinutes ?? ""}
-            onBlur={(e) =>
-              save({ timeMinutes: toNumberOrNull(e.target.value) })
-            }
+            suffix="min"
+            defaultValue={entry.timeMinutes}
+            onBlur={(v) => save({ timeMinutes: toNumberOrNull(v) })}
           />
-          <Input
-            type="number"
-            placeholder="Distância (m)"
-            defaultValue={entry.distance ?? ""}
-            onBlur={(e) =>
-              save({ distance: toNumberOrNull(e.target.value) })
-            }
+
+          <InputWithSuffix
+            placeholder="Distância"
+            suffix="m"
+            defaultValue={entry.distance}
+            onBlur={(v) => save({ distance: toNumberOrNull(v) })}
           />
-          {FinishButton}
+
+          <CheckButton />
         </div>
       )}
 
       {/* DURAÇÃO */}
       {entry.category === "duration" && (
         <div className="flex gap-2 items-center">
-          <Input
-            type="number"
+          <InputWithSuffix
             placeholder="Min"
-            defaultValue={entry.durationMinutes ?? ""}
-            onBlur={(e) =>
-              save({
-                durationMinutes: toNumberOrNull(e.target.value),
-              })
+            suffix="min"
+            defaultValue={entry.durationMinutes}
+            onBlur={(v) =>
+              save({ durationMinutes: toNumberOrNull(v) })
             }
           />
-          <Input
-            type="number"
+
+          <InputWithSuffix
             placeholder="Seg"
-            defaultValue={entry.durationSeconds ?? ""}
-            onBlur={(e) =>
-              save({
-                durationSeconds: toNumberOrNull(e.target.value),
-              })
+            suffix="s"
+            defaultValue={entry.durationSeconds}
+            onBlur={(v) =>
+              save({ durationSeconds: toNumberOrNull(v) })
             }
           />
-          {FinishButton}
+
+          <CheckButton />
         </div>
       )}
 

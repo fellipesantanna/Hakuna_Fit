@@ -1,7 +1,13 @@
 import { supabase } from "@/lib/supabase"
-import type { RoutineExercise, CreateRoutineExerciseInput, ExerciseCategory } from "@/lib/types"
+import type {
+  RoutineExercise,
+  CreateRoutineExerciseInput,
+  ExerciseCategory,
+} from "@/lib/types"
 
-/** Linha crua (DB) com join de exercises */
+/* ============================================================
+   DB RAW TYPE
+============================================================ */
 type DbRoutineExercise = {
   id: string
   routine_id: string
@@ -19,14 +25,35 @@ type DbRoutineExercise = {
   target_hours: number | null
   target_distance: number | null
 
-  exercises?: {
-    name: string
-    category: ExerciseCategory
-    equipment: string | null
-    notes: string | null
-  } | { name: string; category: ExerciseCategory; equipment: string | null; notes: string | null }[] | null
+  exercises?:
+    | {
+        name: string
+        category: ExerciseCategory
+        equipment: string | null
+        notes: string | null
+      }
+    | {
+        name: string
+        category: ExerciseCategory
+        equipment: string | null
+        notes: string | null
+      }[]
+    | null
+
+  // ⚠️ join pode vir como objeto OU array
+  routines?:
+    | {
+        deleted_at: string | null
+      }
+    | {
+        deleted_at: string | null
+      }[]
+    | null
 }
 
+/* ============================================================
+   FRONT TYPE
+============================================================ */
 export type RoutineExerciseWithMeta = RoutineExercise & {
   exerciseName: string
   exerciseCategory: ExerciseCategory
@@ -34,10 +61,21 @@ export type RoutineExerciseWithMeta = RoutineExercise & {
   exerciseNotes?: string | null
 }
 
+/* ============================================================
+   MAPPER
+============================================================ */
 function mapRoutineExercise(row: DbRoutineExercise): RoutineExerciseWithMeta {
-  const ex = row.exercises
-    ? (Array.isArray(row.exercises) ? row.exercises[0] : row.exercises)
-    : null
+  const ex = Array.isArray(row.exercises)
+    ? row.exercises[0]
+    : row.exercises ?? null
+
+  // normaliza routines (defensivo, mesmo sem usar)
+  const routine = Array.isArray(row.routines)
+    ? row.routines[0]
+    : row.routines ?? null
+
+  // se quiser, aqui dá pra fazer assert extra
+  // if (routine?.deleted_at) throw new Error("Rotina deletada")
 
   return {
     id: row.id,
@@ -56,7 +94,6 @@ function mapRoutineExercise(row: DbRoutineExercise): RoutineExerciseWithMeta {
     targetHours: row.target_hours,
     targetDistance: row.target_distance,
 
-    // meta do exercício (join)
     exerciseName: ex?.name ?? "",
     exerciseCategory: ex?.category ?? "strength",
     exerciseEquipment: ex?.equipment ?? null,
@@ -64,6 +101,9 @@ function mapRoutineExercise(row: DbRoutineExercise): RoutineExerciseWithMeta {
   }
 }
 
+/* ============================================================
+   GET (somente rotinas ATIVAS)
+============================================================ */
 export async function getRoutineExercises(routineId: string) {
   const { data, error } = await supabase
     .from("routine_exercises")
@@ -84,9 +124,13 @@ export async function getRoutineExercises(routineId: string) {
         category,
         equipment,
         notes
+      ),
+      routines!inner (
+        deleted_at
       )
     `)
     .eq("routine_id", routineId)
+    .is("routines.deleted_at", null)
     .order("position", { ascending: true })
 
   if (error) throw error
@@ -94,55 +138,86 @@ export async function getRoutineExercises(routineId: string) {
   return (data ?? []).map(mapRoutineExercise)
 }
 
+/* ============================================================
+   ADD
+============================================================ */
 export async function addRoutineExercise(input: CreateRoutineExerciseInput) {
   const payload = {
     routine_id: input.routineId,
     exercise_id: input.exerciseId,
     position: input.position,
+
     sets: input.sets ?? null,
+
     target_reps: input.targetReps ?? null,
     target_weight: input.targetWeight ?? null,
+
     target_minutes: input.targetMinutes ?? null,
     target_seconds: input.targetSeconds ?? null,
+
     target_hours: input.targetHours ?? null,
     target_distance: input.targetDistance ?? null,
   }
 
-  const { error } = await supabase.from("routine_exercises").insert(payload)
+  const { error } = await supabase
+    .from("routine_exercises")
+    .insert(payload)
 
-  if (error) {
-    console.error("Erro ao adicionar exercício na rotina:", error)
-    throw error
-  }
+  if (error) throw error
 }
 
-export async function updateRoutineExercise(id: string, patch: Partial<RoutineExercise>) {
+/* ============================================================
+   UPDATE
+============================================================ */
+export async function updateRoutineExercise(
+  id: string,
+  patch: Partial<RoutineExercise>
+) {
   const payload: any = {}
 
   if ("sets" in patch) payload.sets = patch.sets ?? null
+
   if ("targetReps" in patch) payload.target_reps = patch.targetReps ?? null
-  if ("targetWeight" in patch) payload.target_weight = patch.targetWeight ?? null
+  if ("targetWeight" in patch)
+    payload.target_weight = patch.targetWeight ?? null
 
-  if ("targetMinutes" in patch) payload.target_minutes = patch.targetMinutes ?? null
-  if ("targetSeconds" in patch) payload.target_seconds = patch.targetSeconds ?? null
+  if ("targetMinutes" in patch)
+    payload.target_minutes = patch.targetMinutes ?? null
+  if ("targetSeconds" in patch)
+    payload.target_seconds = patch.targetSeconds ?? null
 
-  if ("targetHours" in patch) payload.target_hours = patch.targetHours ?? null
-  if ("targetDistance" in patch) payload.target_distance = patch.targetDistance ?? null
+  if ("targetHours" in patch)
+    payload.target_hours = patch.targetHours ?? null
+  if ("targetDistance" in patch)
+    payload.target_distance = patch.targetDistance ?? null
 
-  const { error } = await supabase.from("routine_exercises").update(payload).eq("id", id)
+  const { error } = await supabase
+    .from("routine_exercises")
+    .update(payload)
+    .eq("id", id)
+
   if (error) throw error
 }
 
+/* ============================================================
+   DELETE (apenas o exercício)
+============================================================ */
 export async function deleteRoutineExercise(id: string) {
-  const { error } = await supabase.from("routine_exercises").delete().eq("id", id)
+  const { error } = await supabase
+    .from("routine_exercises")
+    .delete()
+    .eq("id", id)
+
   if (error) throw error
 }
 
+/* ============================================================
+   REORDER
+============================================================ */
 export async function swapRoutineExercisePosition(
   a: { id: string; position: number },
   b: { id: string; position: number }
 ) {
-  // atualiza A → posição de B
   const r1 = await supabase
     .from("routine_exercises")
     .update({ position: b.position })
@@ -150,7 +225,6 @@ export async function swapRoutineExercisePosition(
 
   if (r1.error) throw r1.error
 
-  // atualiza B → posição de A
   const r2 = await supabase
     .from("routine_exercises")
     .update({ position: a.position })

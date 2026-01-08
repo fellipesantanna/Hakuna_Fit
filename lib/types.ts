@@ -72,6 +72,8 @@ export interface WorkoutExercise {
   workoutId: string
   exerciseId: string
 
+  position: number
+
   category: WorkoutExerciseCategory
 
   // FORÇA / PESO LIVRE
@@ -125,4 +127,24 @@ export interface CreateRoutineExerciseInput {
   targetSeconds?: number
   targetHours?: number
   targetDistance?: number
+}
+
+export interface CreateWorkoutExerciseInput {
+  workoutId: string
+  exerciseId: string
+  category: WorkoutExerciseCategory
+  position: number
+
+  // FORÇA / PESO LIVRE
+  reps?: number | null
+  weight?: number | null
+
+  // CARDIO
+  timeHours?: number | null
+  timeMinutes?: number | null
+  distance?: number | null
+
+  // DURAÇÃO
+  durationMinutes?: number | null
+  durationSeconds?: number | null
 }
