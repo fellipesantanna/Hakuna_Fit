@@ -5,6 +5,13 @@ import { useSearchParams, useRouter } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog"
 
 import type { Workout, ExerciseCategory, Exercise } from "@/lib/types"
 import { startWorkout, finishWorkout, cancelWorkout } from "@/lib/api/workout"
@@ -46,6 +53,10 @@ export function WorkoutContent() {
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [loading, setLoading] = useState(true)
 
+  // UI states
+  const [addOpen, setAddOpen] = useState(false)
+  const [search, setSearch] = useState("")
+
   useEffect(() => {
     initWorkout()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -85,7 +96,7 @@ export function WorkoutContent() {
 
       setWorkout(w)
 
-      /* 4) Herdar exercícios da rotina (ORDENADOS) */
+      /* 4) Herdar exercícios da rotina */
       if (routineId) {
         const routineExercises = (await getRoutineExercises(routineId))
           .sort((a, b) => a.position - b.position)
@@ -137,7 +148,7 @@ export function WorkoutContent() {
         }
       }
 
-      /* 5) Carrega workout_exercises ORDENADOS */
+      /* 5) Carrega workout_exercises */
       const loaded = await getWorkoutExercises(w.id)
       setEntries(loaded)
     } catch (err) {
@@ -150,7 +161,7 @@ export function WorkoutContent() {
   }
 
   /* =========================
-     Derived (ORDENADO)
+     Derived
   ========================= */
   const grouped = useMemo(() => {
     const map = new Map<string, WorkoutExerciseWithName[]>()
@@ -179,6 +190,21 @@ export function WorkoutContent() {
       .sort((a, b) => a.position - b.position)
   }, [entries])
 
+  const addedExerciseIds = useMemo(() => {
+    return new Set(grouped.map(g => g.exerciseId))
+  }, [grouped])
+
+  const filteredExercises = useMemo(() => {
+    return exercises
+      .filter(ex =>
+        ex.name.toLowerCase().includes(search.toLowerCase())
+      )
+      .sort((a, b) =>
+        a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" })
+      )
+  }, [exercises, search])
+
+
   /* =========================
      Actions
   ========================= */
@@ -204,7 +230,7 @@ export function WorkoutContent() {
   async function handleAddSet(exerciseId: string, category: ExerciseCategory) {
     if (!workout) return
 
-    const group = grouped.find((g) => g.exerciseId === exerciseId)
+    const group = grouped.find(g => g.exerciseId === exerciseId)
 
     await addWorkoutExerciseSet({
       workoutId: workout.id,
@@ -267,7 +293,7 @@ export function WorkoutContent() {
         {workout.routineName ?? "Treino Livre"}
       </h1>
 
-      {grouped.map((g) => (
+      {grouped.map(g => (
         <Card key={g.exerciseId} className="p-4 space-y-3">
           <div className="flex justify-between gap-3">
             <div>
@@ -319,19 +345,67 @@ export function WorkoutContent() {
         </Card>
       ))}
 
-      <Card className="p-4 space-y-2">
-        <h2 className="font-semibold">Adicionar exercício</h2>
-        {exercises.map((ex) => (
-          <Button
-            key={ex.id}
-            variant="outline"
-            className="w-full justify-start"
-            onClick={() => handleAddExercise(ex)}
-          >
-            {ex.name}
-          </Button>
-        ))}
+      {/* ADD EXERCISE */}
+      <Card className="p-4">
+        <Button className="w-full" onClick={() => setAddOpen(true)}>
+          + Adicionar exercício
+        </Button>
       </Card>
+
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent
+          className="
+      p-0 
+      h-[85vh] 
+      max-h-[85vh] 
+      flex 
+      flex-col
+    "
+        >
+          {/* HEADER FIXO */}
+          <DialogHeader className="px-4 py-3 border-b shrink-0">
+            <DialogTitle>Adicionar exercício</DialogTitle>
+
+            <Input
+              placeholder="Buscar exercício..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </DialogHeader>
+
+          {/* LISTA SCROLLÁVEL */}
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+            {filteredExercises.map((ex) => {
+              const alreadyAdded = addedExerciseIds.has(ex.id)
+
+              return (
+                <Button
+                  key={ex.id}
+                  variant="outline"
+                  className="w-full justify-between"
+                  disabled={alreadyAdded}
+                  onClick={() => {
+                    handleAddExercise(ex)
+                    setAddOpen(false)
+                    setSearch("")
+                  }}
+                >
+                  <span>{ex.name}</span>
+
+                </Button>
+              )
+            })}
+
+            {filteredExercises.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center pt-4">
+                Nenhum exercício encontrado
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+
 
       <div className="flex gap-3 pt-4">
         <Button variant="outline" className="w-1/2" onClick={handleCancel}>

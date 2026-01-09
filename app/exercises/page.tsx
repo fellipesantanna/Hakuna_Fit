@@ -55,6 +55,11 @@ export default function ExercisesPage() {
     e.name.toLowerCase().includes(search.toLowerCase())
   )
 
+  const sortedExercises = [...filteredExercises].sort((a, b) =>
+    a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" })
+  )
+
+
   const strength = filteredExercises.filter((e) => e.category === "strength")
   const cardio = filteredExercises.filter((e) => e.category === "cardio")
   const duration = filteredExercises.filter((e) => e.category === "duration")
@@ -245,7 +250,8 @@ export default function ExercisesPage() {
             )}
 
             {["strength", "cardio", "duration", "free_weight"].map((cat) => {
-              const list = filteredExercises.filter(e => e.category === cat)
+              const list = sortedExercises.filter(e => e.category === cat)
+
               if (list.length === 0) return null
 
               return (

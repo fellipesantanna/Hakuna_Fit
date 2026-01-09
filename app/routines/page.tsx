@@ -10,9 +10,13 @@ import { AuthGuard } from "@/components/auth-guard"
 
 import type { Routine } from "@/lib/types"
 import { getRoutines, deleteRoutine } from "@/lib/api/routines"
+import { useRouter } from "next/navigation"
+
 
 export default function RoutinesPage() {
   const [routines, setRoutines] = useState<Routine[]>([])
+  const router = useRouter()
+
 
   useEffect(() => {
     load()
@@ -37,11 +41,12 @@ export default function RoutinesPage() {
         <div className="px-4 py-6 space-y-4">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold">Rotinas</h1>
-            <Button asChild size="sm">
-              <Link href="/routines/new">
-                <Plus className="h-4 w-4 mr-2" />
-                Criar
-              </Link>
+            <Button
+              size="sm"
+              onClick={() => router.push("/routines/new")}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Criar
             </Button>
           </div>
 
