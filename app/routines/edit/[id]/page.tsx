@@ -24,6 +24,28 @@ import { ExercisePicker } from "@/components/exercise-picker"
 /* ============================================================
    HELPERS
 ============================================================ */
+
+function InputWithSuffix(props: {
+  placeholder: string
+  defaultValue?: number | string | null
+  suffix: string
+  onBlur: (v: string) => void
+}) {
+  return (
+    <div className="relative flex-1">
+      <Input
+        placeholder={props.placeholder}
+        defaultValue={props.defaultValue ?? ""}
+        onBlur={(e) => props.onBlur(e.target.value)}
+        className="pr-10"
+      />
+      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+        {props.suffix}
+      </span>
+    </div>
+  )
+}
+
 function toNumberOrNull(v: string) {
   if (v.trim() === "") return null
   const n = Number(v)
@@ -165,7 +187,12 @@ export default function EditRoutinePage() {
                     </p>
                   </div>
 
-                  <span className="text-lg">
+                  <span
+                    className="
+                      text-2xl 
+                      font-semibold 
+                      leading-none
+                  ">
                     {isOpen ? "▾" : "▸"}
                   </span>
                 </div>
@@ -221,42 +248,39 @@ export default function EditRoutinePage() {
                   {/* FORÇA / PESO LIVRE */}
                   {(cat === "strength" ||
                     cat === "free_weight") && (
-                    <div className="grid grid-cols-3 gap-2">
-                      <Input
-                        placeholder="Reps"
-                        defaultValue={re.targetReps ?? ""}
-                        onBlur={(e) =>
-                          handleUpdate(re.id, {
-                            targetReps: toNumberOrNull(
-                              e.target.value
-                            ),
-                          })
-                        }
-                      />
-                      <Input
-                        placeholder="Kg"
-                        defaultValue={re.targetWeight ?? ""}
-                        onBlur={(e) =>
-                          handleUpdate(re.id, {
-                            targetWeight: toNumberOrNull(
-                              e.target.value
-                            ),
-                          })
-                        }
-                      />
-                      <Input
-                        placeholder="Desc (s)"
-                        defaultValue={re.targetSeconds ?? ""}
-                        onBlur={(e) =>
-                          handleUpdate(re.id, {
-                            targetSeconds: toNumberOrNull(
-                              e.target.value
-                            ),
-                          })
-                        }
-                      />
-                    </div>
-                  )}
+                      <div className="flex gap-2">
+                        <InputWithSuffix
+                          placeholder="Reps"
+                          suffix="reps"
+                          defaultValue={re.targetReps}
+                          onBlur={(v) =>
+                            handleUpdate(re.id, {
+                              targetReps: toNumberOrNull(v),
+                            })
+                          }
+                        />
+                        <InputWithSuffix
+                          placeholder="Peso"
+                          suffix="kg"
+                          defaultValue={re.targetWeight}
+                          onBlur={(v) =>
+                            handleUpdate(re.id, {
+                              targetWeight: toNumberOrNull(v),
+                            })
+                          }
+                        />
+                        <InputWithSuffix
+                          placeholder="Descanso"
+                          suffix="s"
+                          defaultValue={re.targetSeconds}
+                          onBlur={(v) =>
+                            handleUpdate(re.id, {
+                              targetSeconds: toNumberOrNull(v),
+                            })
+                          }
+                        />
+                      </div>
+                    )}
 
                   {/* CARDIO */}
                   {cat === "cardio" && (

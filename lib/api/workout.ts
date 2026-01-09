@@ -5,13 +5,38 @@ export async function startWorkout(input: {
   routineId?: string
   routineName?: string
 }) {
+
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   if (!user) throw new Error("Não autenticado")
 
- const payload = {
+  // 1️⃣ verifica treino ativo
+  const { data: active } = await supabase
+    .from("workouts")
+    .select("*")
+    .eq("user_id", user.id)
+    .is("end_time", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (active) {
+    return {
+      id: active.id,
+      userId: active.user_id,
+      routineId: active.routine_id,
+      routineName: active.routine_name,
+      startTime: active.start_time,
+      endTime: active.end_time,
+      createdAt: active.created_at,
+      isNew: false, // 🔴 CHAVE
+    }
+  }
+
+  // 2️⃣ cria treino novo
+  const payload = {
     user_id: user.id,
     routine_id: input.routineId ?? null,
     routine_name: input.routineName ?? null,
@@ -26,7 +51,7 @@ export async function startWorkout(input: {
 
   if (error) throw error
 
-   return {
+  return {
     id: data.id,
     userId: data.user_id,
     routineId: data.routine_id,
@@ -34,6 +59,7 @@ export async function startWorkout(input: {
     startTime: data.start_time,
     endTime: data.end_time,
     createdAt: data.created_at,
+    isNew: true, // 🔴 CHAVE
   }
 }
 
@@ -65,4 +91,3 @@ export async function cancelWorkout(workoutId: string) {
     .eq("id", workoutId)
     .eq("user_id", user.id)
 }
-

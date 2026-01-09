@@ -97,7 +97,7 @@ export function WorkoutContent() {
       setWorkout(w)
 
       /* 4) Herdar exercícios da rotina */
-      if (routineId) {
+      if (routineId && w.isNew) {
         const routineExercises = (await getRoutineExercises(routineId))
           .sort((a, b) => a.position - b.position)
 
@@ -114,6 +114,7 @@ export function WorkoutContent() {
                 category: re.exerciseCategory,
                 reps: re.targetReps ?? null,
                 weight: re.targetWeight ?? null,
+                durationSeconds: re.targetSeconds ?? null, // ✅ AQUI
                 position: re.position,
               })
             }
@@ -295,15 +296,15 @@ export function WorkoutContent() {
 
       {grouped.map(g => (
         <Card key={g.exerciseId} className="p-4 space-y-3">
-          <div className="flex justify-between gap-3">
-            <div>
+          <div className="flex items-start gap-3">
+            <div className="flex-1">
               <h3 className="font-semibold">{g.name}</h3>
               <p className="text-xs text-muted-foreground">
                 {labelCategory(g.category)} • {g.sets.length} série(s)
               </p>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex shrink-0 gap-2">
               <Button
                 size="sm"
                 variant="outline"

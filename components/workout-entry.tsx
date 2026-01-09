@@ -20,17 +20,47 @@ function toNumberOrNull(v: string) {
 const DEFAULT_REST_SECONDS = 60
 
 export function WorkoutEntry({ entry }: Props) {
+  const [completed, setCompleted] = useState<boolean>(!!entry.completed)
   const [restEndAt, setRestEndAt] = useState<number | null>(null)
   const [restRemaining, setRestRemaining] = useState(0)
+
+  /* =========================
+     SYNC COM BACKEND
+  ========================= */
+  useEffect(() => {
+    setCompleted(!!entry.completed)
+  }, [entry.completed])
 
   async function save(payload: Partial<WorkoutExercise>) {
     await updateWorkoutExercise(entry.id, payload)
   }
 
   async function finishSet() {
+  if (completed) return
+
+  // 1️⃣ UI otimista
+  setCompleted(true)
+
+  // 2️⃣ calcula descanso (rotina OU padrão)
+  const restSeconds =
+    entry.durationSeconds && entry.durationSeconds > 0
+      ? entry.durationSeconds
+      : DEFAULT_REST_SECONDS
+
+  // 3️⃣ inicia descanso
+  setRestEndAt(Date.now() + restSeconds * 1000)
+
+  // 4️⃣ persiste no backend
+  try {
     await save({ completed: true })
-    setRestEndAt(Date.now() + DEFAULT_REST_SECONDS * 1000)
+  } catch (err) {
+    console.error(err)
+    // rollback se falhar
+    setCompleted(false)
+    setRestEndAt(null)
+    alert("Erro ao salvar série")
   }
+}
 
   /* =========================
      REST TIMER
@@ -79,18 +109,22 @@ export function WorkoutEntry({ entry }: Props) {
   }
 
   /* =========================
-     BOTÃO CHECK
+     BOTÃO CHECK (FINAL)
   ========================= */
   function CheckButton() {
     return (
       <Button
+        type="button"
         onClick={finishSet}
-        variant={entry.completed ? "default" : "outline"}
-        className={`h-10 w-10 p-0 ${
-          entry.completed
-            ? "bg-green-600 hover:bg-green-600 text-white"
+        variant="outline"
+        className={`
+    h-10 w-10 min-w-10 p-0
+    flex items-center justify-center
+    ${completed
+            ? "bg-green-600 text-white cursor-default pointer-events-none"
             : "text-muted-foreground"
-        }`}
+          }
+  `}
       >
         ✓
       </Button>
@@ -102,24 +136,24 @@ export function WorkoutEntry({ entry }: Props) {
       {/* FORÇA / PESO LIVRE */}
       {(entry.category === "strength" ||
         entry.category === "free_weight") && (
-        <div className="flex gap-2 items-center">
-          <InputWithSuffix
-            placeholder="Reps"
-            suffix="reps"
-            defaultValue={entry.reps}
-            onBlur={(v) => save({ reps: toNumberOrNull(v) })}
-          />
+          <div className="flex gap-2 items-center">
+            <InputWithSuffix
+              placeholder="Reps"
+              suffix="reps"
+              defaultValue={entry.reps}
+              onBlur={(v) => save({ reps: toNumberOrNull(v) })}
+            />
 
-          <InputWithSuffix
-            placeholder="Peso"
-            suffix="kg"
-            defaultValue={entry.weight}
-            onBlur={(v) => save({ weight: toNumberOrNull(v) })}
-          />
+            <InputWithSuffix
+              placeholder="Peso"
+              suffix="kg"
+              defaultValue={entry.weight}
+              onBlur={(v) => save({ weight: toNumberOrNull(v) })}
+            />
 
-          <CheckButton />
-        </div>
-      )}
+            <CheckButton />
+          </div>
+        )}
 
       {/* CARDIO */}
       {entry.category === "cardio" && (
